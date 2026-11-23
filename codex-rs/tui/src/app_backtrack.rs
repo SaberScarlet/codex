@@ -64,6 +64,8 @@ pub(crate) const SIDE_EDIT_PREVIOUS_UNAVAILABLE_MESSAGE: &str =
 pub(crate) struct BacktrackState {
     /// Hold terminal input between confirming a prompt edit and dispatching its revert.
     pub(crate) revert_queued: bool,
+    /// First press of 'd' arms discarding the latest prompt; a second confirms it.
+    pub(crate) discard_armed: bool,
     /// True when Esc has primed backtrack mode in the main view.
     pub(crate) primed: bool,
     /// Session id of the base thread whose transcript is being inspected.
@@ -158,6 +160,14 @@ impl App {
 
     /// Revert the current thread before the selected prompt.
     pub(crate) fn apply_backtrack_selection(&mut self, selection: BacktrackSelection) {
+        self.apply_backtrack_selection_with_discard(selection, false);
+    }
+
+    fn apply_backtrack_selection_with_discard(
+        &mut self,
+        selection: BacktrackSelection,
+        discard_prompt: bool,
+    ) {
         if self.chat_widget.side_conversation_active() {
             self.reset_backtrack_state();
             self.chat_widget
@@ -179,6 +189,7 @@ impl App {
                 thread_id: selection.thread_id,
                 selected_cell: Arc::clone(&self.transcript_cells[index]),
                 prompt: selection.prompt,
+                discard_prompt,
             });
     }
 
@@ -366,6 +377,7 @@ impl App {
 
     /// Apply a computed backtrack selection to the overlay and internal counter.
     pub(crate) fn apply_backtrack_selection_internal(&mut self, nth_user_message: usize) {
+        self.backtrack.discard_armed = false;
         if let Some(cell_idx) = nth_user_position(&self.transcript_cells, nth_user_message) {
             self.backtrack.nth_user_message = nth_user_message;
             if let Some(Overlay::Transcript(t)) = &mut self.overlay {
@@ -515,6 +527,23 @@ impl App {
         tui.frame_requester().schedule_frame();
     }
 
+    /// Discard the latest submitted prompt without putting its text back in the composer.
+    /// The existing paginated revert path handles durable history and state updates.
+    fn overlay_discard_latest_prompt(&mut self, tui: &mut tui::Tui) {
+        let Some(count) = user_count(&self.transcript_cells).checked_sub(1) else {
+            return;
+        };
+        if self.backtrack.nth_user_message != count {
+            return;
+        }
+        let Some(selection) = self.backtrack_selection(count) else {
+            return;
+        };
+        self.close_transcript_overlay(tui);
+        self.apply_backtrack_selection_with_discard(selection, true);
+        tui.frame_requester().schedule_frame();
+    }
+
     /// Confirm a primed backtrack from the main view (no overlay visible).
     /// Computes the prompt state from the selected user message.
     pub(crate) fn confirm_backtrack_from_main(&mut self) -> Option<BacktrackSelection> {
@@ -527,6 +556,7 @@ impl App {
     pub(crate) fn reset_backtrack_state(&mut self) {
         self.backtrack.origin = None;
         self.backtrack.primed = false;
+        self.backtrack.discard_armed = false;
         self.backtrack.overlay_preview_active = false;
         self.backtrack.base_id = None;
         self.backtrack.nth_user_message = usize::MAX;
