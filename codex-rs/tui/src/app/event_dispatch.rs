@@ -939,6 +939,7 @@ impl App {
                 thread_id,
                 selected_cell,
                 mut prompt,
+                discard_prompt,
             } => {
                 if self.chat_widget.thread_id() != Some(thread_id) {
                     return Ok(AppRunControl::Continue);
@@ -1047,7 +1048,9 @@ impl App {
                     return Err(color_eyre::Report::new(err).wrap_err("prompt edit could not be confirmed; resume this session to reload its history"));
                     }
                 };
-                self.chat_widget.restore_user_message_to_composer(prompt.clone());
+                if !discard_prompt {
+                    self.chat_widget.restore_user_message_to_composer(prompt.clone());
+                }
                 // Stop on any post-mutation failure: accepting input against the old displayed
                 // transcript would hide the fact that server history has already changed.
                 tokio::time::timeout(Duration::from_secs(/*secs*/ 10), async {
@@ -1071,7 +1074,9 @@ impl App {
                     /*input_state*/ None,
                     crate::chatwidget::ThreadInputStateRestoreMode { preserve_in_flight_turn: false },
                 );
-                self.chat_widget.restore_user_message_to_composer(prompt);
+                if !discard_prompt {
+                    self.chat_widget.restore_user_message_to_composer(prompt);
+                }
                 self.chat_widget.set_queue_autosend_suppressed(/*suppressed*/ true);
                 self.abort_thread_event_listener(thread_id);
                 if let Some(mut rx) = self.active_thread_rx.take() {
