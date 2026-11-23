@@ -24,7 +24,16 @@ impl App {
             ("←→/hl".to_string(), "prompts"),
         ];
         full_hints.extend(details.clone());
-        full_hints.extend([("↵".to_string(), "rewind"), ("esc".to_string(), "back")]);
+        let discard_hint = if self.backtrack.discard_armed {
+            "confirm discard"
+        } else {
+            "discard latest"
+        };
+        full_hints.extend([
+            ("↵".to_string(), "rewind"),
+            ("d".to_string(), discard_hint),
+            ("esc".to_string(), "back"),
+        ]);
         let mut compact_hints = vec![("↑↓/jk ←→/hl".to_string(), "")];
         compact_hints.extend(details);
         compact_hints.extend([("↵".to_string(), "rewind"), ("esc".to_string(), "back")]);
