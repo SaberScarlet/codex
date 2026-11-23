@@ -890,6 +890,8 @@ pub(crate) enum AppEvent {
         thread_id: ThreadId,
         selected_cell: Arc<dyn HistoryCell>,
         prompt: UserMessage,
+        /// Do not restore the selected prompt to the composer after reverting.
+        discard_prompt: bool,
     },
     FinishPromptRevert {
         thread_id: ThreadId,
