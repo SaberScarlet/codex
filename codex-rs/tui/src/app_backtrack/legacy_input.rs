@@ -211,6 +211,26 @@ impl App {
             (KeyCode::Esc, KeyEventKind::Press) => {
                 self.cancel_transcript_browsing(tui);
             }
+            (KeyCode::Char('d'), KeyEventKind::Press) if self.backtrack.base_id.is_some() => {
+                // Two deliberate presses prevent accidental destruction of the latest turn.
+                let latest = user_count(&self.transcript_cells).checked_sub(1);
+                if latest != Some(self.backtrack.nth_user_message) {
+                    self.backtrack.discard_armed = false;
+                    self.chat_widget.add_info_message(
+                        "Only the most recent prompt can be discarded.".to_string(),
+                        None,
+                    );
+                } else if self.backtrack.discard_armed {
+                    self.overlay_discard_latest_prompt(tui);
+                } else {
+                    self.backtrack.discard_armed = true;
+                    self.chat_widget.add_info_message(
+                        "Press d again to discard the latest prompt and its turn.".to_string(),
+                        None,
+                    );
+                }
+                tui.frame_requester().schedule_frame();
+            }
             (
                 code @ (KeyCode::Left | KeyCode::Right | KeyCode::Char('h' | 'l')),
                 KeyEventKind::Press | KeyEventKind::Repeat,
